@@ -51,6 +51,7 @@ EQUAL_GROUP                     = 'EQH/EQL'
 GAPS_GROUP                      = 'Fair Value Gaps'
 LEVELS_GROUP                    = 'Highs & Lows MTF'
 ZONES_GROUP                     = 'Premium & Discount Zones'
+TEMP_GROUP                      = 'Temperature Entries'
 
 modeTooltip                     = 'Allows to display historical Structure or only the recent ones'
 styleTooltip                    = 'Indicator color theme'
@@ -72,6 +73,8 @@ fairValueGapsThresholdTooltip   = 'Filter out non significant fair value gaps'
 fairValueGapsTimeframeTooltip   = 'Fair value gaps timeframe'
 fairValueGapsExtendTooltip      = 'Determine how many bars to extend the Fair Value Gap boxes on chart'
 showPremiumDiscountZonesTooltip = 'Display premium, discount, and equilibrium zones on chart'
+temperatureLengthTooltip        = 'Moving average length for temperature calculation'
+temperatureThresholdTooltip     = 'Threshold for temperature based entries (%)'
 
 modeInput                       = input.string( HISTORICAL, 'Mode',                     group = SMART_GROUP,    tooltip = modeTooltip, options = [HISTORICAL, PRESENT])
 styleInput                      = input.string( COLORED,    'Style',                    group = SMART_GROUP,    tooltip = styleTooltip,options = [COLORED, MONOCHROME])
@@ -132,6 +135,11 @@ showPremiumDiscountZonesInput   = input(        false,      'Premium/Discount Zo
 premiumZoneColorInput           = input.color(  RED,        'Premium Zone',             group = ZONES_GROUP)
 equilibriumZoneColorInput       = input.color(  GRAY,       'Equilibrium Zone',         group = ZONES_GROUP)
 discountZoneColorInput          = input.color(  GREEN,      'Discount Zone',            group = ZONES_GROUP)
+
+showTemperatureInput            = input(        true,       'Show Temperature Entries',   group = TEMP_GROUP)
+temperatureLengthInput          = input.int(    20,         'Temperature Length',         group = TEMP_GROUP, tooltip = temperatureLengthTooltip, minval = 1)
+temperatureLongThresholdInput   = input.float(  0.5,        'Long Threshold (%)',        group = TEMP_GROUP, tooltip = temperatureThresholdTooltip, step = 0.1)
+temperatureShortThresholdInput  = input.float(  0.5,        'Short Threshold (%)',       group = TEMP_GROUP, tooltip = temperatureThresholdTooltip, step = 0.1)
 
 //---------------------------------------------------------------------------------------------------------------------}
 //DATA STRUCTURES & VARIABLES
@@ -765,6 +773,17 @@ parsedOpen  = showTrendInput ? open : na
 candleColor = internalTrend.bias == BULLISH ? swingBullishColor : swingBearishColor
 plotcandle(parsedOpen,high,low,close,color = candleColor, wickcolor = candleColor, bordercolor = candleColor)
 
+// temperature oscillator and entry signals
+temperatureValue         = 100 * (close - ta.sma(close, temperatureLengthInput)) / ta.sma(close, temperatureLengthInput)
+longTemperatureEntry     = ta.crossover(temperatureValue,  temperatureLongThresholdInput)
+shortTemperatureEntry    = ta.crossunder(temperatureValue, -temperatureShortThresholdInput)
+
+if showTemperatureInput
+    if longTemperatureEntry
+        drawLabel(time, low, 'LONG', GREEN, label.style_label_up)
+    if shortTemperatureEntry
+        drawLabel(time, high, 'SHORT', RED, label.style_label_down)
+
 if showHighLowSwingsInput or showPremiumDiscountZonesInput
     updateTrailingExtremes()
 
@@ -842,5 +861,7 @@ alertcondition(currentAlerts.equalLows,                 'Equal Lows',           
 
 alertcondition(currentAlerts.bullishFairValueGap,       'Bullish FVG',                  'Bullish FVG formed')
 alertcondition(currentAlerts.bearishFairValueGap,       'Bearish FVG',                  'Bearish FVG formed')
+alertcondition(longTemperatureEntry,                    'Temperature Long',              'Temperature based long entry')
+alertcondition(shortTemperatureEntry,                   'Temperature Short',             'Temperature based short entry')
 
 //---------------------------------------------------------------------------------------------------------------------}
